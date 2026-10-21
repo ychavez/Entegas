@@ -1,0 +1,37 @@
+name: Ejecutar pruebas
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+  permissions:
+    contents: read
+
+jobs:
+  name: Pruebas automatizadas
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v7
+   - uses: actions/setup-dotnet@v6
+     with: dotnet-version: "10.0.x"
+   - name: Restaurar dependencias
+     run: dotnet restore CursoCursor.slnx
+   - name: Compilar
+     run: dotnet build CursoCursor.slnx --no-restore --configuration Release
+   - name: Ejecutar pruebas
+     id: tests
+     run: >-
+         dotnet test CursoCursor.slnx --no-build --configuration Release
+          --results-directory artifacts/tests
+          --logger "trx;LogFileName=tests.trx"
+  - name: Publicar resultados de pruebas
+    if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+    uses: actions/upload-artifact@v7
+    with:
+      name: resultados-pruebas
+      path: artifacts/tests/
+      if-no-files-found: error
+      retention-days: 14
+
+   
