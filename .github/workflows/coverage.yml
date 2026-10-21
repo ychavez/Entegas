@@ -1,0 +1,47 @@
+name: Revisar cobertura
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Cobertura de pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verificar el control de cobertura
+        shell: pwsh
+        run: ./tests/ci/Test-CoverageGate.ps1
+      - name: Restaurar dependencias
+        run: dotnet restore CursoCursor.slnx
+      - name: Compilar
+        run: dotnet build CursoCursor.slnx --no-restore --configuration Release
+      - name: Ejecutar pruebas con cobertura
+        id: tests
+        run: >-
+          dotnet test CursoCursor.slnx --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --settings coverage.runsettings
+          --results-directory artifacts/coverage
+          --logger "trx;LogFileName=tests.trx"
+      - name: Exigir 80% de lineas y ramas
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        shell: pwsh
+        run: ./scripts/check-coverage.ps1 -ResultsDirectory artifacts/coverage
+      - name: Publicar resultados y cobertura
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: cobertura-y-pruebas
+          path: artifacts/coverage/
+          if-no-files-found: error
+          retention-days: 14

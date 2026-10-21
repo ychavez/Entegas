@@ -1,0 +1,55 @@
+name: Revisar seguridad
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    name: Seguridad de dependencias
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Rechazar paquetes vulnerables y errores de auditoria
+        id: audit
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/security -Force | Out-Null
+          dotnet restore CursoCursor.slnx --force-evaluate --no-http-cache `
+            -p:NuGetAudit=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=low `
+            -warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905 `
+            2>&1 | Tee-Object -FilePath artifacts/security/nuget-audit.log
+          if ($LASTEXITCODE -ne 0) { throw 'La auditoria de dependencias fallo. Revisa nuget-audit.log.' }
+      - name: Generar reporte de vulnerabilidades
+        if: ${{ !cancelled() && steps.audit.outcome != 'skipped' }}
+        shell: pwsh
+        run: |
+          dotnet list CursoCursor.slnx package --no-restore --vulnerable --include-transitive `
+            --format json --output-version 1 | Set-Content -Path artifacts/security/nuget-audit.json -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar el reporte de vulnerabilidades.' }
+          $result = if ('${{ steps.audit.outcome }}' -eq 'success') { 'APROBADO' } else { 'FALLIDO; consulta el log para distinguir vulnerabilidades de errores de consulta.' }
+          @"
+          ## Seguridad de dependencias
+
+          Resultado: $result
+
+          Se auditan paquetes directos y transitivos de toda la solucion. Cualquier vulnerabilidad conocida (baja, moderada, alta o critica) hace fallar el check. Los errores al consultar la base de vulnerabilidades tambien lo hacen fallar.
+
+          Consulta el artefacto auditoria-de-seguridad para ver el log y el reporte JSON.
+          "@ | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+      - name: Publicar auditoria de seguridad
+        if: ${{ !cancelled() && steps.audit.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: auditoria-de-seguridad
+          path: artifacts/security/
+          if-no-files-found: error
+          retention-days: 14

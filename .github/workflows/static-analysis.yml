@@ -1,0 +1,39 @@
+name: Analizar codigo con Roslyn
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  roslyn:
+    name: Analisis estatico Roslyn
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restaurar dependencias
+        run: dotnet restore CursoCursor.slnx
+      - name: Analizar API y pruebas con advertencias como errores
+        id: analysis
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/static-analysis -Force | Out-Null
+          dotnet build CursoCursor.slnx --configuration Release --no-restore --no-incremental `
+            -p:RunStaticAnalysis=true -warnaserror `
+            "-flp:logfile=artifacts/static-analysis/build.log;verbosity=normal"
+          if ($LASTEXITCODE -ne 0) { throw 'Roslyn detecto errores. Revisa los diagnosticos y el log.' }
+      - name: Publicar diagnosticos de Roslyn
+        if: ${{ !cancelled() && steps.analysis.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: analisis-roslyn
+          path: artifacts/static-analysis/
+          if-no-files-found: error
+          retention-days: 14
