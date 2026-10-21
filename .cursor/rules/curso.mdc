@@ -1,0 +1,21 @@
+---
+description: Reglas de trabajo para el proyecto práctico del curso de Cursor e IA
+alwaysApply: true
+---
+
+Este repositorio enseña colaboración con IA. La API es un ejemplo local .NET 10, no un producto listo para producción.
+
+- Lee README.md, el requisito y los archivos relevantes antes de editar.
+- Para desarrollar una funcionalidad, toma su archivo de specs/ como contrato y sigue docs/flujo-multiagente.md como protocolo reutilizable. Las guías de curso/ explican las prácticas; no son funcionalidades pendientes. Guardar una spec no inicia su ejecución.
+- El protocolo requiere una sola spec de entrada. No cargues ni ejecutes otras specs por defecto; si la funcionalidad declara una dependencia, comprueba su estado y consulta otro contrato solo cuando sea necesario para resolverla. No conviertas una skill o una guía del curso en requisito del patrón.
+- Si el humano solicita expresamente la ruta completa de specs/README.md, aplica el protocolo a cada etapa en el orden acordado. En creación desde cero, el coordinador prepara primero solución, proyectos y referencias; después delega src/ y tests/. Los archivos de raíz, scripts y configuración deben tener propietario explícito. Reutiliza lo correcto cuando el proyecto ya existe.
+- Explica el comportamiento en lenguaje de negocio; no conviertas la tarea en una clase de C#.
+- Conserva las rutas y campos JSON salvo que el requisito acuerde cambiarlos.
+- Mantén capacidad, detección de duplicados y registro dentro de una operación atómica. Normaliza correo con Trim y ToLowerInvariant.
+- Una cancelación libera capacidad. No expongas datos personales en el catálogo.
+- Divide el trabajo con propietarios de archivos. No ejecutes compilaciones concurrentes sobre el mismo checkout; el coordinador verifica al integrar.
+- No cambies pruebas para ocultar un fallo. Reporta comando, resultado real y pendientes; nunca afirmes una ejecución que no hiciste.
+- Mantén las modificaciones acotadas. No añadas servicios externos ni paquetes sin que la tarea los requiera.
+- En una práctica explícita de Bugbot puede introducirse el fallo controlado mediante scripts/introduce-bug.ps1 en la rama lab/bugbot-capacidad. Identifica las pruebas rojas como resultado esperado del ejercicio.
+- Nunca publiques código, envíes comentarios ni fusiones ramas si la tarea no lo solicita.
+- Llamame Yael
