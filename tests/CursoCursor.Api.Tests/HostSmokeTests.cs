@@ -49,4 +49,11 @@ public sealed class HostSmokeTests : IClassFixture<DevelopmentApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    [Fact]
+    public async Task OpenApi_EnProduction_Responde404(){
+
+
+       Assert.Equal(1,2);
+    }
 }
