@@ -17,6 +17,9 @@ artifacts/
 .vscode/*
 !.vscode/extensions.json
 
+## Cursor
+.cursor/mcp.json
+
 ## OS
 Thumbs.db
 Desktop.ini
