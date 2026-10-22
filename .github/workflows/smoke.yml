@@ -19,10 +19,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restaurar API
-        run: dotnet restore src/Talleres.Api/Talleres.Api.csproj
+        run: dotnet restore src/CursoCursor.Api/CursoCursor.Api.csproj
       - name: Publicar API en Release
         run: >-
-          dotnet publish src/Talleres.Api/Talleres.Api.csproj
+          dotnet publish src/CursoCursor.Api/CursoCursor.Api.csproj
           --configuration Release --no-restore --output artifacts/publish
       - name: Arrancar API y verificar peticiones HTTP
         id: smoke
