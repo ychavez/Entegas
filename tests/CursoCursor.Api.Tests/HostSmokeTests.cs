@@ -17,6 +17,17 @@ public sealed class DevelopmentApiFactory : WebApplicationFactory<Program>
 }
 
 /// <summary>
+/// Host de prueba que fuerza Production, donde el documento OpenAPI no se publica.
+/// </summary>
+public sealed class ProductionApiFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Production");
+    }
+}
+
+/// <summary>
 /// Humo del esqueleto inicial: el host arranca y OpenAPI responde en Development.
 /// Criterios: E4, E5. No cubre catálogo, cupo, duplicados ni cancelación.
 /// </summary>
@@ -51,9 +62,13 @@ public sealed class HostSmokeTests : IClassFixture<DevelopmentApiFactory>
     }
 
     [Fact]
-    public async Task OpenApi_EnProduction_Responde404(){
+    public async Task OpenApi_EnProduction_Responde404()
+    {
+        await using var factory = new ProductionApiFactory();
+        using var client = factory.CreateClient();
 
+        using var response = await client.GetAsync("/openapi/v1.json");
 
-       Assert.Equal(1,2);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }
