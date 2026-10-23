@@ -35,8 +35,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/health", () => Results.Json(new { status = "ok" }));
+app.MapGet("/api/time", () => Results.Ok(new UtcTimeResponse(DateTimeOffset.UtcNow)))
+    .Produces<UtcTimeResponse>(StatusCodes.Status200OK);
 app.MapWorkshopEndpoints();
 
 app.Run();
 
 public partial class Program;
+
+public sealed record UtcTimeResponse(DateTimeOffset Utc);

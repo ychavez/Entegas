@@ -70,7 +70,7 @@ public sealed class CatalogTests
         Assert.Equal("No se encontró el taller.", problem.GetProperty("detail").GetString());
     }
 
-    /// <summary>CAT-04. Id que no es GUID: 404 de enrutamiento, sin exigir el código de negocio.</summary>
+    /// <summary>CAT-04. Id que no es GUID: 404 de enrutamiento, sin el código de negocio.</summary>
     [Fact]
     public async Task Detalle_IdNoGuid_Devuelve404YNo500()
     {
@@ -81,6 +81,15 @@ public sealed class CatalogTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
+        AssertProblemContentType(response);
+        Assert.DoesNotContain("workshop_not_found", response.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("   at ", response.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("stackTrace", response.Body, StringComparison.OrdinalIgnoreCase);
+
+        using var document = JsonDocument.Parse(response.Body);
+        Assert.Equal(404, document.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Not Found", document.RootElement.GetProperty("title").GetString());
+        Assert.False(document.RootElement.TryGetProperty("code", out _));
     }
 
     /// <summary>CAT-05. Repetir catálogo y ficha no crea una reserva ni cambia el cuerpo.</summary>
@@ -187,8 +196,97 @@ public sealed class CatalogTests
         Assert.DoesNotContain("stackTrace", response.Body, StringComparison.OrdinalIgnoreCase);
 
         using var document = JsonDocument.Parse(response.Body);
-        var title = document.RootElement.GetProperty("title").GetString();
-        Assert.False(string.IsNullOrWhiteSpace(title));
+        Assert.Equal(404, document.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Not Found", document.RootElement.GetProperty("title").GetString());
+    }
+
+    /// <summary>
+    /// Production publica salud y catálogo. El documento OpenAPI sigue apagado.
+    /// </summary>
+    [Fact]
+    public async Task Produccion_PublicaSaludYCatalogo_YOcultaOpenApi()
+    {
+        await using var factory = new ProductionApiFactory();
+        using var client = factory.CreateClient();
+
+        var health = await ReadAsync(client, "/health");
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        AssertJsonContentType(health);
+        using (var healthDocument = JsonDocument.Parse(health.Body))
+            Assert.Equal("ok", healthDocument.RootElement.GetProperty("status").GetString());
+
+        var catalogo = await ReadAsync(client, RutaCatalogo);
+        Assert.Equal(HttpStatusCode.OK, catalogo.StatusCode);
+        AssertJsonContentType(catalogo);
+        using (var catalogoDocument = JsonDocument.Parse(catalogo.Body))
+        {
+            Assert.Equal(JsonValueKind.Array, catalogoDocument.RootElement.ValueKind);
+            Assert.Equal(1, catalogoDocument.RootElement.GetArrayLength());
+            AssertSeedWorkshop(catalogoDocument.RootElement[0]);
+        }
+
+        var detalle = await ReadAsync(client, RutaDetalle(IdTallerInicial));
+        Assert.Equal(HttpStatusCode.OK, detalle.StatusCode);
+        using (var detalleDocument = JsonDocument.Parse(detalle.Body))
+            AssertSeedWorkshop(detalleDocument.RootElement);
+
+        var inexistente = await ReadAsync(client, RutaDetalle(IdInexistente));
+        Assert.Equal(HttpStatusCode.NotFound, inexistente.StatusCode);
+        AssertProblemContentType(inexistente);
+        using (var inexistenteDocument = JsonDocument.Parse(inexistente.Body))
+        {
+            Assert.Equal(404, inexistenteDocument.RootElement.GetProperty("status").GetInt32());
+            Assert.Equal("workshop_not_found", inexistenteDocument.RootElement.GetProperty("code").GetString());
+        }
+
+        var rutaInexistente = await ReadAsync(client, "/no-existe");
+        Assert.Equal(HttpStatusCode.NotFound, rutaInexistente.StatusCode);
+        AssertProblemContentType(rutaInexistente);
+        Assert.DoesNotContain("   at ", rutaInexistente.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("stackTrace", rutaInexistente.Body, StringComparison.OrdinalIgnoreCase);
+        using (var rutaDocument = JsonDocument.Parse(rutaInexistente.Body))
+            Assert.Equal("Not Found", rutaDocument.RootElement.GetProperty("title").GetString());
+
+        var openApi = await ReadAsync(client, "/openapi/v1.json");
+        Assert.Equal(HttpStatusCode.NotFound, openApi.StatusCode);
+    }
+
+    /// <summary>
+    /// El catálogo no acepta escritura: POST responde 405 y el taller inicial sigue igual.
+    /// </summary>
+    [Fact]
+    public async Task PostAlCatalogo_Devuelve405SinTrazaYNoCreaTaller()
+    {
+        await using var factory = new DevelopmentApiFactory();
+        using var client = factory.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, RutaCatalogo);
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        Assert.StartsWith(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.ToString() ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("   at ", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("stackTrace", body, StringComparison.OrdinalIgnoreCase);
+        Assert.True(response.Content.Headers.TryGetValues("Allow", out var allow));
+        Assert.NotNull(allow);
+        Assert.Contains(allow, value => value.Contains("GET", StringComparison.OrdinalIgnoreCase));
+
+        using (var document = JsonDocument.Parse(body))
+        {
+            Assert.Equal(405, document.RootElement.GetProperty("status").GetInt32());
+            Assert.Equal("Method Not Allowed", document.RootElement.GetProperty("title").GetString());
+            Assert.False(document.RootElement.TryGetProperty("code", out _));
+        }
+
+        var catalogo = await ReadAsync(client, RutaCatalogo);
+        Assert.Equal(HttpStatusCode.OK, catalogo.StatusCode);
+        using var catalogoDocument = JsonDocument.Parse(catalogo.Body);
+        Assert.Equal(1, catalogoDocument.RootElement.GetArrayLength());
+        AssertSeedWorkshop(catalogoDocument.RootElement[0]);
     }
 
     /// <summary>CAT-08. OpenAPI en Development incluye salud, catálogo y el 404 de la ficha.</summary>

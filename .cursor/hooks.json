@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/verify-api-tests.ps1 mark"
+      }
+    ],
+    "stop": [
+      {
+        "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/verify-api-tests.ps1 verify",
+        "timeout": 240,
+        "loop_limit": 2
+      }
+    ]
+  }
+}
